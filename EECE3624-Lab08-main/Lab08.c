@@ -4,8 +4,8 @@
  *    Author: Dr. Greg Nordstrom
  *   Created: 12/30/17
  *  Mod Date: 3/28/19, 1/17/21
- *  Modified:
- *   ModDate:
+ *  Modified: Jake Matthews
+ *   ModDate: 10/20/2026
  * 
  * Processor: ATmega128A (on the ReadyAVR board)
  *
@@ -33,11 +33,27 @@
 #define STOPBITS    1 // 1,2
 #define PARITY      0 // 0=none, 1=odd, 2=even
 
-/* Your code here.  */
+void printString(const char *str) {
+	int i = 0;
+	while (str[i] != '\0') {
+		uart_tx(str[i]);
+		i++;
+	}
+}
+
+// Function to display the startup  message
+void displayStartupMessage(void) {
+	printString("\r\n\r\n");
+	printString("RS232 Communications Server\r\n");
+	printString("Status: Active\r\n");
+	printString("Jake Matthews\r\n");
+	printString("EECE3624\r\n");
+	printString("Fall 2026\r\n");
+	printString("\r\n\r\n");
+}
 
 int main(void)
 {
-	/* Your code here.  */
 
     /* See the UARTLibrary.h for available calls.
 	 *     	  // initialize the UART
@@ -51,10 +67,71 @@ int main(void)
 	 *        c = uart_rx();
 	 */
 
+	unsigned char c;
+	unsigned char endCount = 0;
+	int halted = 0;
+
+	
+	
+	DDRA |= (1 << PA0);
+	PORTA |= (1 << PA0); // Turn LED off initially (if active low)
+
 	uart_init(BAUDRATE, DATABITS, STOPBITS, PARITY);
+	displayStartupMessage();
+	
 	while(1)
 	{
-		/* your loop code here */
+		if (halted) {
+			// Stop responding to input after "end" sequence until hard reset
+			continue;
+		}
+
+		// Receive character from PuTTY
+		c = uart_rx();
+
+		// character received by blinking LED0 for 75ms
+		PORTA &= ~(1 << PA0); // Turn LED0 ON 
+		_delay_ms(75);
+		PORTA |= (1 << PA0);  // Turn LED0 OFF
+
+		// Check for "Esc" key 
+		if (c == ESC) {
+			displayStartupMessage();
+			endCount = 0;
+			continue;
+		}
+
+		// Check for 'end' 
+		if (endCount == 0) {
+			if (c == 'e') endCount = 1;
+			else endCount = 0;
+			} else if (endCount == 1) {
+			if (c == 'n') endCount = 2;
+			else if (c == 'e') endCount = 1;
+			else endCount = 0;
+			} else if (endCount == 2) {
+			if (c == 'd') {
+				endCount = 3;
+				} else if (c == 'e') {
+				endCount = 1;
+				} else {
+				endCount = 0;
+			}
+		}
+
+		// Echo character back
+		if (c == CR) {
+			uart_tx(CR);
+			uart_tx(LF); // Send LF automatically
+			} else {
+			uart_tx(c);
+		}
+
+		// If "end" sequence is fully matched
+		if (endCount == 3) {
+			printString("\r\n\r\nBye\r\n");
+			halted = 1; // Stop responding
+		}
 		
 	}
 	return 0;

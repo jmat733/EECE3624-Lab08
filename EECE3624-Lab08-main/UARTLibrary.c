@@ -3,8 +3,8 @@
  *  Lab Name: (Needed for Lab07 and Lab08)
  *    Author: Dr. Greg Nordstrom
  *   Created: 3/3/2019
- *  Modified: 
- *  Mod Date:
+ *  Modified: Jake Matthews
+ *  Mod Date: 10/20/1026
  * Processor: ATmega128A (on the ReadyAVR board)
  *
  * This is intended to be compiled as an AVR Library Project and
@@ -35,15 +35,31 @@
 void uart_init(long unsigned int baudrate, unsigned char databits, unsigned char stopbits, unsigned char parity) {
     /* your code here */
 	// set baud rate (via UBRR0 high and low registers)
-    
+    unsigned int ubrr = (F_OSC / (16UL * baudrate)) - 1;
 	// set databits
-    
+    UBRR1H = (unsigned char)(ubrr >> 8);
+    UBRR1L = (unsigned char)ubrr;
+	unsigned char temp_ucsr1c = 0;
+	
+	if (databits == 7) {
+		temp_ucsr1c |= (1 << UCSZ11); // UCSZ1[1:0] = 10 for 7 bits
+		} else if (databits == 8) {
+		temp_ucsr1c |= (1 << UCSZ11) | (1 << UCSZ10); // UCSZ1[1:0] = 11 for 8 bits
+	}
 	// set parity
-    
+    if (parity == 1) {
+	    temp_ucsr1c |= (1 << UPM11) | (1 << UPM10); // odd
+	    } else if (parity == 2) {
+	    temp_ucsr1c |= (1 << UPM11); // even
+    }
     // set stopbits
-    
+    if (stopbits == 2) {
+	    temp_ucsr1c |= (1 << USBS1);
+    }
 	// finally, enable receiver and transmitter
-    
+    UCSR1C = temp_ucsr1c;
+	UCSR1B = (1 << RXEN1) | (1 << TXEN1);
+	
 }
 
 // This function waits for space in the USART transmit buffer. When space
@@ -52,7 +68,11 @@ void uart_init(long unsigned int baudrate, unsigned char databits, unsigned char
 // checking is performed and the function does not return a value.
 void uart_tx(unsigned char data) {
     /* your code here */
-
+	// waiting
+	while (!(UCSR1A & (1 << UDRE1)));
+	
+	// put data into transmission
+	UDR1 = data;
 }
 
 // This function blocks until a character is received in the USART input
@@ -60,5 +80,10 @@ void uart_tx(unsigned char data) {
 // an unsigned character. No error checking is performed.
 unsigned char uart_rx(void) {
 	/* your code here */
+    // waiting
+    while (!(UCSR1A & (1 << RXC1)));
     
+    // Return received data from buffer
+    
+    return UDR1;
 }
